@@ -141,3 +141,30 @@ export async function sendApprovalResponse(
   if (!res.ok) {
     const data = await res.json();
     throw new Error(data.error || 'Failed to send approval response');
+  }
+}
+
+// Background process management
+export interface ProcessInfo {
+  id: string;
+  command: string;
+  cwd: string;
+  startTime: number;
+}
+
+export async function getProcesses(sessionId: string): Promise<{ processes: ProcessInfo[] }> {
+  const res = await fetch(`${API_BASE}/processes/${sessionId}`);
+  return res.json();
+}
+
+export async function killProcess(sessionId: string, processId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/processes/${sessionId}/kill`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ processId }),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Failed to kill process');
+  }
+}

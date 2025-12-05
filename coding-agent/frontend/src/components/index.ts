@@ -13,3 +13,4 @@ export { TargetSelector } from './TargetSelector';
 export { ThemeToggle } from './ThemeToggle';
 export { FilePreviewModal } from './FilePreviewModal';
 export { ApprovalDialog } from './ApprovalDialog';
+export { ProcessManager } from './ProcessManager';

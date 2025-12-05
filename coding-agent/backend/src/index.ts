@@ -253,26 +253,48 @@ app.post('/api/target/validate', async (req: Request, res: Response) => {
   }
 });
 
-// Handle approval response from frontend
-app.post('/api/approval', (req: Request, res: Response) => {
-  const { requestId, decision, pattern } = req.body;
+// Read file for preview
+app.get('/api/file', async (req: Request, res: Response) => {
+  const filePath = req.query.path as string;
 
-  if (!requestId || !decision) {
-    res.status(400).json({ error: 'requestId and decision required' });
+  if (!filePath) {
+    res.status(400).json({ error: 'path query parameter required' });
     return;
   }
 
-  const validDecisions = ['allow_once', 'allow_pattern', 'allow_tool', 'deny'];
-  if (!validDecisions.includes(decision)) {
-    res.status(400).json({ error: 'Invalid decision. Must be: allow_once, allow_pattern, allow_tool, or deny' });
-    return;
-  }
+  const fs = await import('fs/promises');
+  const pathModule = await import('path');
 
-  const success = approvalManager.handleResponse({ requestId, decision, pattern });
-  if (success) {
-    res.json({ status: 'processed' });
-  } else {
-    res.status(404).json({ error: 'Approval request not found or expired' });
+  try {
+    const resolved = pathModule.resolve(filePath);
+
+    // Validate the path is within allowed directories
+    if (!filesystemMiddleware.validatePath(resolved)) {
+      res.status(403).json({ error: 'Path outside allowed directories' });
+      return;
+    }
+
+    const stat = await fs.stat(resolved);
+
+    if (stat.isDirectory()) {
+      res.status(400).json({ error: 'Path is a directory, not a file' });
+      return;
+    }
+
+    // Read file content (limit to 100KB for preview)
+    const content = await fs.readFile(resolved, 'utf-8');
+    const truncated = content.length > 100000;
+
+    res.json({
+      path: resolved,
+      content: truncated ? content.slice(0, 100000) : content,
+      size: stat.size,
+      modified: stat.mtime,
+      truncated,
+    });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Unknown error';
+    res.status(404).json({ error: `Failed to read file: ${error}` });
   }
 });
 
@@ -346,6 +368,56 @@ app.post('/api/target/complete', async (req: Request, res: Response) => {
   } catch (err) {
     // If we can't read the directory, return empty suggestions
     res.json({ suggestions: [], parentDir: null });
+  }
+});
+
+// Handle approval response from frontend
+app.post('/api/approval', (req: Request, res: Response) => {
+  const { requestId, decision, pattern } = req.body;
+
+  if (!requestId || !decision) {
+    res.status(400).json({ error: 'requestId and decision required' });
+    return;
+  }
+
+  const validDecisions = ['allow_once', 'allow_pattern', 'allow_tool', 'deny'];
+  if (!validDecisions.includes(decision)) {
+    res.status(400).json({ error: 'Invalid decision. Must be: allow_once, allow_pattern, allow_tool, or deny' });
+    return;
+  }
+
+  const success = approvalManager.handleResponse({ requestId, decision, pattern });
+  if (success) {
+    res.json({ status: 'processed' });
+  } else {
+    res.status(404).json({ error: 'Approval request not found or expired' });
+  }
+});
+
+// Get running background processes
+app.get('/api/processes/:sessionId', (req: Request, res: Response) => {
+  const { sessionId } = req.params;
+  const processes = filesystemMiddleware.getRunningProcesses(sessionId);
+  res.json({ processes });
+});
+
+// Kill a background process
+app.post('/api/processes/:sessionId/kill', (req: Request, res: Response) => {
+  const { sessionId } = req.params;
+  const { processId } = req.body;
+
+  if (!processId) {
+    res.status(400).json({ error: 'processId required' });
+    return;
+  }
+
+  const success = filesystemMiddleware.killProcess(sessionId, processId);
+  if (success) {
+    // Emit event to frontend
+    emitEvent(sessionId, 'process_killed', { processId });
+    res.json({ status: 'killed' });
+  } else {
+    res.status(404).json({ error: 'Process not found' });
   }
 });
 

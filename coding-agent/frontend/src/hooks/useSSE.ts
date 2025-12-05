@@ -24,8 +24,9 @@ export function useSSE(sessionId: string | null, handlers: Record<string, EventH
     const eventTypes = [
       'connected', 'text', 'tool_start', 'tool_complete',
       'todo_update', 'subtask_start', 'subtask_complete',
-      'context_update', 'checkpoint_created', 'reverted', 'error',
-      'approval_required', 'approval_result'
+      'context_update', 'checkpoint_created', 'checkpoint_updated', 'reverted', 'error',
+      'approval_required', 'approval_result',
+      'process_started', 'process_killed', 'process_exit'
     ];
 
     eventTypes.forEach(eventType => {

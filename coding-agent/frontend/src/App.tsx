@@ -15,6 +15,7 @@ import {
   ThemeToggle,
   FilePreviewModal,
   ApprovalDialog,
+  ProcessManager,
 } from './components';
 import { useSSE } from './hooks/useSSE';
 import * as api from './api';
@@ -101,14 +102,19 @@ function App() {
     }, []),
 
     tool_start: useCallback((data: unknown) => {
-      const { name, summary, input } = data as { name: string; summary: string; input?: unknown };
+      const { name, summary, input, processId } = data as { name: string; summary: string; input?: unknown; processId?: string };
+      // Generate ID synchronously BEFORE state update to avoid race condition
+      // (tool_complete may arrive before React processes the state update)
+      const toolStepId = `tool-${Date.now()}`;
+      activeToolStepRef.current = toolStepId;
+
       // Finalize any streaming text step
       setCurrentSteps(prev => {
         const finalized = prev.map(s =>
           s.type === 'text' && s.isStreaming ? { ...s, isStreaming: false } : s
         );
         const toolStep: AssistantStep = {
-          id: `tool-${Date.now()}`,
+          id: toolStepId,
           type: 'tool',
           timestamp: Date.now(),
           isCollapsed: false,
@@ -117,8 +123,8 @@ function App() {
           toolSummary: summary,
           status: 'running',
           filePath: extractFilePath(summary),
+          processId, // Track background process ID for later updates
         };
-        activeToolStepRef.current = toolStep.id;
         return [...finalized, toolStep];
       });
       // Also update sidebar tools
@@ -131,7 +137,7 @@ function App() {
       // (the state update function runs asynchronously when React processes the batch)
       const stepIdToComplete = activeToolStepRef.current;
       activeToolStepRef.current = null;
-
+      
       if (stepIdToComplete) {
         setCurrentSteps(prev => prev.map(s =>
           s.id === stepIdToComplete
@@ -202,6 +208,13 @@ function App() {
       setCheckpoints(prev => [{ id, timestamp: Date.now() }, ...prev]);
     }, []),
 
+    checkpoint_updated: useCallback((data: unknown) => {
+      const { id, name, actionSummary } = data as { id: string; name: string; actionSummary?: string };
+      setCheckpoints(prev => prev.map(cp =>
+        cp.id === id ? { ...cp, name, actionSummary } : cp
+      ));
+    }, []),
+
     reverted: useCallback(() => {
       if (sessionId) {
         api.getTodos(sessionId).then(data => setTodos(data.todos || []));
@@ -240,6 +253,27 @@ function App() {
         ));
       }
     }, []),
+
+    // Background process events
+    process_killed: useCallback((data: unknown) => {
+      const { processId } = data as { processId: string };
+      // Find and update the tool step associated with this process
+      setCurrentSteps(prev => prev.map(s =>
+        s.processId === processId
+          ? { ...s, status: 'stopped', toolOutput: (s.toolOutput || '') + '\n[Process stopped]' }
+          : s
+      ));
+    }, []),
+
+    process_exit: useCallback((data: unknown) => {
+      const { processId, code } = data as { processId: string; code: number | null };
+      // Find and update the tool step when the process exits naturally
+      setCurrentSteps(prev => prev.map(s =>
+        s.processId === processId
+          ? { ...s, status: code === 0 ? 'completed' : 'failed', toolOutput: (s.toolOutput || '') + `\n[Process exited with code ${code}]` }
+          : s
+      ));
+    }, []),
   };
 
   useSSE(sessionId, sseHandlers);
@@ -253,16 +287,12 @@ function App() {
 
     try {
       await api.sendMessage(sessionId, content, model);
-      // Finalize streaming steps - get all text content
-      const textContent = currentStepsRef.current
-        .filter(s => s.type === 'text')
-        .map(s => s.content || '')
-        .join('\n\n');
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: textContent || '(Task completed)' },
-      ]);
-      setCurrentSteps([]);
+      // Finalize streaming text steps
+      setCurrentSteps(prev => prev.map(s =>
+        s.type === 'text' && s.isStreaming ? { ...s, isStreaming: false } : s
+      ));
+      // Note: Don't add text to messages separately - currentSteps contains the full response
+      // (text + tools interlaced) and is rendered by AssistantMessage
     } catch (err) {
       console.error('Failed to send message:', err);
     } finally {
@@ -326,7 +356,7 @@ function App() {
   return (
     <div className="flex h-screen w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
       {/* LEFT: Main Chat Area */}
-      <main className="flex flex-1 flex-col border-r border-slate-200 dark:border-slate-700">
+      <main className="flex flex-1 flex-col min-w-0 border-r border-slate-200 dark:border-slate-700">
         {/* Header */}
         <header className="flex h-14 items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6">
           <div className="flex items-center gap-4">
@@ -347,7 +377,7 @@ function App() {
         </header>
 
         {/* Messages Scroll Area */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 bg-white dark:bg-slate-900">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 py-4 bg-white dark:bg-slate-900">
           {messages.length === 0 && currentSteps.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-slate-400 dark:text-slate-500">
               {!hasApiKey ? (
@@ -397,6 +427,9 @@ function App() {
             </div>
           )}
         </div>
+
+        {/* Section: Background Processes */}
+        <ProcessManager sessionId={sessionId} />
 
         {/* Section: Tool Activity */}
         <div className="h-1/3 p-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-hidden">

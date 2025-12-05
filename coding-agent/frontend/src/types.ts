@@ -35,6 +35,8 @@ export interface ContextUsage {
 export interface Checkpoint {
   id: string;
   timestamp: number;
+  name?: string;           // Short description (2-5 words)
+  actionSummary?: string;  // Detailed summary for tooltip
 }
 
 // IDE-style step types for assistant messages
@@ -55,8 +57,9 @@ export interface AssistantStep {
   toolInput?: Record<string, unknown>;
   toolOutput?: string;
   toolSummary?: string;
-  status?: 'running' | 'completed' | 'failed' | 'pending_approval';
+  status?: 'running' | 'completed' | 'failed' | 'pending_approval' | 'stopped';
   filePath?: string;
+  processId?: string; // For background processes - links to ProcessManager
 
   // For subtask steps
   subtaskPrompt?: string;
@@ -81,3 +84,13 @@ export interface ApprovalResponse {
   requestId: string;
   decision: ApprovalDecision;
   pattern?: string;
+}
+
+// Background process types
+export interface BackgroundProcess {
+  id: string;
+  command: string;
+  cwd: string;
+  startTime: number;
+  output?: string[];
+}
