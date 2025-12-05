@@ -38,14 +38,16 @@ describe('FilesystemMiddleware', () => {
       expect(middleware.systemPrompt).toContain('Shell Execution');
     });
 
-    it('should provide five tools', () => {
-      expect(middleware.tools).toHaveLength(5);
+    it('should provide seven tools', () => {
+      expect(middleware.tools).toHaveLength(7);
       const toolNames = middleware.tools.map(t => t.name);
       expect(toolNames).toContain('read_file');
       expect(toolNames).toContain('write_file');
       expect(toolNames).toContain('edit_file');
       expect(toolNames).toContain('list_directory');
       expect(toolNames).toContain('execute_shell');
+      expect(toolNames).toContain('list_processes');
+      expect(toolNames).toContain('kill_process');
     });
   });
 

@@ -143,6 +143,7 @@ describe('Orchestrator', () => {
       mockLLMClient.streamMessage.mockReturnValue(
         createMockStream([
           { type: 'text', text: 'Response' },
+          { type: 'usage_update', usage: { input_tokens: 100, output_tokens: 50 } },
           { type: 'message_stop' },
         ])
       );
@@ -150,7 +151,9 @@ describe('Orchestrator', () => {
       await orchestrator.processMessage('session-1', 'Hello', mockConfig);
 
       expect(mockConfig.emit).toHaveBeenCalledWith('context_update', expect.objectContaining({
-        tokens: expect.any(Number),
+        inputTokens: expect.any(Number),
+        outputTokens: expect.any(Number),
+        totalTokens: expect.any(Number),
         percentage: expect.any(Number),
       }));
     });

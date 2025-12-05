@@ -110,6 +110,23 @@ export class Orchestrator {
         } else if (event.type === 'content_block_stop' && currentToolCall) {
           toolCalls.push(currentToolCall);
           currentToolCall = null;
+        } else if (event.type === 'usage_update' && event.usage) {
+          // Update context usage with actual token counts from API
+          const contextUsage = this.contextManager.updateUsage(sessionId, event.usage);
+          state.contextUsage = {
+            tokens: contextUsage.totalTokens,
+            percentage: contextUsage.percentage,
+          };
+          // Emit detailed context update to frontend
+          config.emit('context_update', {
+            inputTokens: contextUsage.inputTokens,
+            outputTokens: contextUsage.outputTokens,
+            totalTokens: contextUsage.totalTokens,
+            percentage: contextUsage.percentage,
+            warning: contextUsage.warning,
+            atSoftLimit: contextUsage.atSoftLimit,
+            maxTokens: this.contextManager.getMaxTokens(),
+          });
         }
       }
 
@@ -204,9 +221,8 @@ export class Orchestrator {
         state.messages.push({ role: 'assistant', content: textContent });
       }
 
-      // Update context usage
-      state.contextUsage = this.contextManager.calculateUsage(state.messages);
-      config.emit('context_update', state.contextUsage);
+      // Note: Context usage is now updated in real-time via usage_update events
+      // from the LLM streaming response, providing accurate token counts
     }
 
     // Run after hooks
@@ -270,6 +286,7 @@ export class Orchestrator {
 
   setModel(model: string): void {
     this.llmClient.setModel(model);
+    this.contextManager.setModel(model);
   }
 
   setApiKey(apiKey: string): void {

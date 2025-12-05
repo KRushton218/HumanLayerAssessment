@@ -44,7 +44,15 @@ function App() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [tools, setTools] = useState<ToolRun[]>([]);
   const [subtask, setSubtask] = useState<SubtaskStatus | null>(null);
-  const [contextUsage, setContextUsage] = useState<ContextUsage>({ tokens: 0, percentage: 0, warning: false });
+  const [contextUsage, setContextUsage] = useState<ContextUsage>({
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    percentage: 0,
+    warning: false,
+    atSoftLimit: false,
+    maxTokens: 200000,
+  });
   const [checkpoints, setCheckpoints] = useState<Checkpoint[]>([]);
   const [model, setModel] = useState('claude-sonnet-4-20250514');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -282,6 +290,23 @@ function App() {
     if (!sessionId) return;
 
     setIsProcessing(true);
+
+    // Save the previous assistant response (if any) before clearing currentSteps
+    // Use the ref to get the latest value synchronously
+    const previousSteps = currentStepsRef.current;
+    if (previousSteps.length > 0) {
+      // Extract text content for the message content field
+      const textContent = previousSteps
+        .filter(s => s.type === 'text' && s.content)
+        .map(s => s.content)
+        .join('');
+
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: textContent, steps: previousSteps }
+      ]);
+    }
+
     setCurrentSteps([]);
     setMessages(prev => [...prev, { role: 'user', content }]);
 
@@ -388,7 +413,17 @@ function App() {
             </div>
           )}
           {messages.map((msg, idx) => (
-            <ChatMessage key={idx} role={msg.role} content={msg.content} />
+            msg.role === 'assistant' && msg.steps ? (
+              <AssistantMessage
+                key={idx}
+                steps={msg.steps}
+                isStreaming={false}
+                onToggleStepCollapse={handleToggleStepCollapse}
+                onFileClick={handleFileClick}
+              />
+            ) : (
+              <ChatMessage key={idx} role={msg.role} content={msg.content} />
+            )
           ))}
           {currentSteps.length > 0 && (
             <AssistantMessage
