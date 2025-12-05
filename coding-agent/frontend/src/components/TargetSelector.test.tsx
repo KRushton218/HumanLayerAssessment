@@ -1,12 +1,27 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { TargetSelector } from './TargetSelector';
+
+// Mock the API
+vi.mock('../api', () => ({
+  completeTarget: vi.fn(),
+}));
+
+import { completeTarget } from '../api';
 
 describe('TargetSelector', () => {
   const defaultProps = {
     targetDirectory: '/home/user/project',
     onTargetChange: vi.fn(),
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (completeTarget as ReturnType<typeof vi.fn>).mockResolvedValue({
+      suggestions: [],
+      parentDir: null,
+    });
+  });
 
   it('renders the target directory name', () => {
     render(<TargetSelector {...defaultProps} />);
@@ -31,22 +46,22 @@ describe('TargetSelector', () => {
     expect(screen.getByRole('textbox')).toHaveValue('/home/user/project');
   });
 
-  it('cancels editing when cancel button is clicked', () => {
+  it('cancels editing when Escape is pressed', () => {
     render(<TargetSelector {...defaultProps} />);
     fireEvent.click(screen.getByRole('button'));
 
     // Should be in edit mode
     expect(screen.getByRole('textbox')).toBeInTheDocument();
 
-    // Click cancel
-    fireEvent.click(screen.getByTitle('Cancel'));
+    // Press Escape
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
 
     // Should be back to display mode
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.getByText('project')).toBeInTheDocument();
   });
 
-  it('calls onTargetChange when form is submitted', async () => {
+  it('calls onTargetChange when Enter is pressed', async () => {
     const mockOnTargetChange = vi.fn().mockResolvedValue(undefined);
     render(
       <TargetSelector
@@ -62,8 +77,8 @@ describe('TargetSelector', () => {
     const input = screen.getByRole('textbox');
     fireEvent.change(input, { target: { value: '/home/user/other-project' } });
 
-    // Submit form
-    fireEvent.click(screen.getByTitle('Set target'));
+    // Press Enter
+    fireEvent.keyDown(input, { key: 'Enter' });
 
     await waitFor(() => {
       expect(mockOnTargetChange).toHaveBeenCalledWith('/home/user/other-project');
@@ -82,39 +97,111 @@ describe('TargetSelector', () => {
     // Enter edit mode
     fireEvent.click(screen.getByRole('button'));
 
-    // Submit form
-    fireEvent.click(screen.getByTitle('Set target'));
+    // Press Enter to submit
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
 
     await waitFor(() => {
       expect(screen.getByText('Directory not found')).toBeInTheDocument();
     });
   });
 
-  it('resets input value when canceling after an error', async () => {
-    const mockOnTargetChange = vi.fn().mockRejectedValue(new Error('Invalid path'));
-    render(
-      <TargetSelector
-        targetDirectory="/home/user/project"
-        onTargetChange={mockOnTargetChange}
-      />
-    );
-
-    // Enter edit mode and change value
-    fireEvent.click(screen.getByRole('button'));
-    const input = screen.getByRole('textbox');
-    fireEvent.change(input, { target: { value: '/invalid/path' } });
-
-    // Submit and wait for error
-    fireEvent.click(screen.getByTitle('Set target'));
-    await waitFor(() => {
-      expect(screen.getByText('Invalid path')).toBeInTheDocument();
+  it('fetches suggestions when typing', async () => {
+    (completeTarget as ReturnType<typeof vi.fn>).mockResolvedValue({
+      suggestions: ['/home/user/project1', '/home/user/project2'],
+      parentDir: '/home/user',
     });
 
-    // Cancel
-    fireEvent.click(screen.getByTitle('Cancel'));
-
-    // Re-enter edit mode - should show original path
+    render(<TargetSelector {...defaultProps} />);
     fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByRole('textbox')).toHaveValue('/home/user/project');
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '/home/user/pro' } });
+
+    await waitFor(() => {
+      expect(completeTarget).toHaveBeenCalledWith('/home/user/pro');
+    });
+  });
+
+  it('shows autocomplete suggestions dropdown', async () => {
+    (completeTarget as ReturnType<typeof vi.fn>).mockResolvedValue({
+      suggestions: ['/home/user/project1', '/home/user/project2'],
+      parentDir: '/home/user',
+    });
+
+    render(<TargetSelector {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button'));
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '/home/user/' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('project1')).toBeInTheDocument();
+      expect(screen.getByText('project2')).toBeInTheDocument();
+    });
+  });
+
+  it('navigates suggestions with arrow keys', async () => {
+    (completeTarget as ReturnType<typeof vi.fn>).mockResolvedValue({
+      suggestions: ['/home/user/project1', '/home/user/project2'],
+      parentDir: '/home/user',
+    });
+
+    render(<TargetSelector {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button'));
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '/home/user/' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('project1')).toBeInTheDocument();
+    });
+
+    // Press down arrow to select first suggestion
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+
+    // First suggestion should be highlighted (has bg-blue-50 class)
+    const firstSuggestion = screen.getByText('project1').closest('button');
+    expect(firstSuggestion).toHaveClass('bg-blue-50');
+  });
+
+  it('completes suggestion with Tab when only one suggestion', async () => {
+    (completeTarget as ReturnType<typeof vi.fn>).mockResolvedValue({
+      suggestions: ['/home/user/project'],
+      parentDir: '/home/user',
+    });
+
+    render(<TargetSelector {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button'));
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '/home/user/pro' } });
+
+    await waitFor(() => {
+      expect(completeTarget).toHaveBeenCalled();
+    });
+
+    // Press Tab to complete
+    fireEvent.keyDown(input, { key: 'Tab' });
+
+    await waitFor(() => {
+      expect(input).toHaveValue('/home/user/project/');
+    });
+  });
+
+  it('shows help text in dropdown', async () => {
+    (completeTarget as ReturnType<typeof vi.fn>).mockResolvedValue({
+      suggestions: ['/home/user/project1'],
+      parentDir: '/home/user',
+    });
+
+    render(<TargetSelector {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button'));
+
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '/home/user/' } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tab to complete/)).toBeInTheDocument();
+    });
   });
 });

@@ -250,6 +250,79 @@ app.post('/api/target/validate', async (req: Request, res: Response) => {
   }
 });
 
+// Autocomplete directories for path input (terminal-style tab completion)
+app.post('/api/target/complete', async (req: Request, res: Response) => {
+  const { partial } = req.body;
+
+  if (partial === undefined) {
+    res.status(400).json({ error: 'partial path required' });
+    return;
+  }
+
+  const fs = await import('fs/promises');
+  const pathModule = await import('path');
+  const os = await import('os');
+
+  try {
+    // Handle ~ for home directory
+    let expandedPath = partial;
+    if (partial.startsWith('~')) {
+      expandedPath = partial.replace(/^~/, os.homedir());
+    }
+
+    // Resolve to absolute path
+    const resolved = pathModule.resolve(expandedPath);
+
+    // Determine parent directory and prefix to match
+    let parentDir: string;
+    let prefix: string;
+
+    // Check if the path exists and is a directory
+    try {
+      const stat = await fs.stat(resolved);
+      if (stat.isDirectory()) {
+        // Path is an existing directory - list its contents
+        parentDir = resolved;
+        prefix = '';
+      } else {
+        // Path is a file - list parent directory
+        parentDir = pathModule.dirname(resolved);
+        prefix = pathModule.basename(resolved);
+      }
+    } catch {
+      // Path doesn't exist - find the parent directory that does exist
+      parentDir = pathModule.dirname(resolved);
+      prefix = pathModule.basename(resolved);
+    }
+
+    // List directory contents
+    const entries = await fs.readdir(parentDir, { withFileTypes: true });
+
+    // Filter to directories only, matching the prefix
+    const suggestions = entries
+      .filter(entry => entry.isDirectory())
+      .filter(entry => !entry.name.startsWith('.')) // Hide hidden dirs by default
+      .filter(entry => entry.name.toLowerCase().startsWith(prefix.toLowerCase()))
+      .map(entry => {
+        const fullPath = pathModule.join(parentDir, entry.name);
+        // If input started with ~, show it with ~
+        if (partial.startsWith('~')) {
+          return fullPath.replace(os.homedir(), '~');
+        }
+        return fullPath;
+      })
+      .slice(0, 20); // Limit to 20 suggestions
+
+    res.json({
+      suggestions,
+      parentDir: partial.startsWith('~') ? parentDir.replace(os.homedir(), '~') : parentDir
+    });
+  } catch (err) {
+    // If we can't read the directory, return empty suggestions
+    res.json({ suggestions: [], parentDir: null });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

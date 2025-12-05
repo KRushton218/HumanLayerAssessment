@@ -94,3 +94,17 @@ export async function validateTarget(targetDirectory: string): Promise<{ valid: 
   });
   return res.json();
 }
+
+export interface CompletionResult {
+  suggestions: string[];
+  parentDir: string | null;
+}
+
+export async function completeTarget(partial: string): Promise<CompletionResult> {
+  const res = await fetch(`${API_BASE}/target/complete`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ partial }),
+  });
+  return res.json();
+}
