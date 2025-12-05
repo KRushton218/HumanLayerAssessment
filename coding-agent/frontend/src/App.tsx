@@ -199,7 +199,7 @@ function App() {
         </header>
 
         {/* Messages Scroll Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/50">
+        <div className="flex-1 overflow-y-auto px-6 py-4 bg-white">
           {messages.length === 0 && !streamingText && (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               {!hasApiKey ? (
