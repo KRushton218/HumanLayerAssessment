@@ -3,3 +3,4 @@ dist/
 test_output.txt
 $HOME/
 *.log
+.env
