@@ -108,3 +108,20 @@ export async function completeTarget(partial: string): Promise<CompletionResult>
   });
   return res.json();
 }
+
+export interface FilePreview {
+  path: string;
+  content: string;
+  size: number;
+  modified: string;
+  truncated: boolean;
+}
+
+export async function readFile(filePath: string): Promise<FilePreview> {
+  const res = await fetch(`${API_BASE}/file?path=${encodeURIComponent(filePath)}`);
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Failed to read file');
+  }
+  return res.json();
+}

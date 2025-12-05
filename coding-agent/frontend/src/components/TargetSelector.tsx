@@ -24,7 +24,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch suggestions when input changes
   const fetchSuggestions = useCallback(async (partial: string) => {
@@ -198,7 +198,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
     return (
       <button
         onClick={() => setIsEditing(true)}
-        className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors max-w-[200px]"
+        className="flex items-center gap-2 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors max-w-[200px]"
         title={targetDirectory}
       >
         <FolderOpen size={14} className="text-amber-500 flex-shrink-0" />
@@ -211,7 +211,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
     <form onSubmit={handleSubmit} className="relative flex flex-col gap-1">
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400">
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
             <FolderOpen size={14} />
           </div>
           <input
@@ -228,24 +228,24 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
               setTimeout(() => setShowSuggestions(false), 150);
             }}
             placeholder="/path/to/project or ~/project"
-            className={`w-80 pl-8 pr-2 py-1.5 text-xs font-mono bg-white border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
+            className={`w-80 pl-8 pr-2 py-1.5 text-xs font-mono bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border rounded-lg focus:outline-none focus:ring-2 transition-colors ${
               error
-                ? 'border-red-300 focus:border-red-500 focus:ring-red-500/10'
-                : 'border-slate-200 focus:border-blue-500 focus:ring-blue-500/10'
+                ? 'border-red-300 dark:border-red-700 focus:border-red-500 focus:ring-red-500/10'
+                : 'border-slate-200 dark:border-slate-600 focus:border-blue-500 focus:ring-blue-500/10'
             }`}
             autoComplete="off"
             spellCheck={false}
           />
           {isLoadingSuggestions && (
             <div className="absolute right-2 top-1/2 -translate-y-1/2">
-              <Loader2 size={12} className="animate-spin text-slate-400" />
+              <Loader2 size={12} className="animate-spin text-slate-400 dark:text-slate-500" />
             </div>
           )}
         </div>
         <button
           type="submit"
           disabled={!inputValue.trim() || isValidating}
-          className="p-1.5 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="p-1.5 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           title="Set target (Enter)"
         >
           {isValidating ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
@@ -253,7 +253,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
         <button
           type="button"
           onClick={handleCancel}
-          className="p-1.5 text-slate-500 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+          className="p-1.5 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           title="Cancel (Esc)"
         >
           <X size={14} />
@@ -264,7 +264,7 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
       {showSuggestions && suggestions.length > 0 && (
         <div
           ref={suggestionsRef}
-          className="absolute top-full left-0 mt-1 w-80 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg z-50"
+          className="absolute top-full left-0 mt-1 w-80 max-h-48 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-lg z-50"
         >
           {suggestions.map((suggestion, index) => {
             const parts = suggestion.split('/');
@@ -276,21 +276,21 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
                 key={suggestion}
                 type="button"
                 onClick={() => selectSuggestion(suggestion)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left font-mono hover:bg-slate-50 ${
-                  index === selectedIndex ? 'bg-blue-50 text-blue-700' : 'text-slate-700'
+                className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left font-mono hover:bg-slate-50 dark:hover:bg-slate-700 ${
+                  index === selectedIndex ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'
                 }`}
               >
                 <FolderOpen size={12} className="text-amber-500 flex-shrink-0" />
                 <span className="truncate">
-                  <span className="text-slate-400">{parentPath}/</span>
+                  <span className="text-slate-400 dark:text-slate-500">{parentPath}/</span>
                   <span className="font-medium">{dirName}</span>
                 </span>
-                <ChevronRight size={12} className="ml-auto text-slate-300 flex-shrink-0" />
+                <ChevronRight size={12} className="ml-auto text-slate-300 dark:text-slate-500 flex-shrink-0" />
               </button>
             );
           })}
-          <div className="px-3 py-1.5 text-[10px] text-slate-400 border-t border-slate-100 bg-slate-50">
-            Tab to complete • ↑↓ to navigate • Enter to select
+          <div className="px-3 py-1.5 text-[10px] text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900">
+            Tab to complete  to navigate  Enter to select
           </div>
         </div>
       )}

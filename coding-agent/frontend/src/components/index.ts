@@ -1,4 +1,5 @@
 export { ChatMessage } from './ChatMessage';
+export { AssistantMessage } from './AssistantMessage';
 export { TaskRow } from './TaskRow';
 export { ToolStatusItem } from './ToolStatusItem';
 export { ChatInput } from './ChatInput';
@@ -9,3 +10,5 @@ export { CheckpointControls } from './CheckpointControls';
 export { ApiKeyInput } from './ApiKeyInput';
 export { ProgressBar } from './ProgressBar';
 export { TargetSelector } from './TargetSelector';
+export { ThemeToggle } from './ThemeToggle';
+export { FilePreviewModal } from './FilePreviewModal';

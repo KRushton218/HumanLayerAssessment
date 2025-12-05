@@ -1,14 +1,14 @@
 import React, { useMemo } from 'react';
-import { User, Terminal, Copy, Check, FileText, FolderOpen } from 'lucide-react';
+import { Copy, Check, FileText, FolderOpen } from 'lucide-react';
+import type { AssistantStep } from '../../types';
 
-export interface ChatMessageProps {
-  role: 'user' | 'assistant';
-  content: string;
-  isStreaming?: boolean;
+interface TextStepProps {
+  step: AssistantStep;
+  onFileClick?: (path: string) => void;
 }
 
 // Simple markdown-like parser for code blocks, lists, and formatting
-function parseContent(content: string): React.ReactNode[] {
+function parseContent(content: string, onFileClick?: (path: string) => void): React.ReactNode[] {
   const elements: React.ReactNode[] = [];
   const lines = content.split('\n');
   let i = 0;
@@ -29,7 +29,7 @@ function parseContent(content: string): React.ReactNode[] {
       elements.push(
         <CodeBlock key={key++} code={codeLines.join('\n')} language={lang} />
       );
-      i++; // Skip closing ```
+      i++;
       continue;
     }
 
@@ -57,7 +57,7 @@ function parseContent(content: string): React.ReactNode[] {
         items.push(lines[i].replace(/^[-*]\s+/, ''));
         i++;
       }
-      elements.push(<BulletList key={key++} items={items} />);
+      elements.push(<BulletList key={key++} items={items} onFileClick={onFileClick} />);
       continue;
     }
 
@@ -67,7 +67,7 @@ function parseContent(content: string): React.ReactNode[] {
       continue;
     }
 
-    // Regular paragraph - collect consecutive non-empty lines
+    // Regular paragraph
     const paragraphLines: string[] = [];
     while (i < lines.length && lines[i].trim() !== '' && !lines[i].startsWith('```') && !lines[i].match(/^[-*]\s+/)) {
       paragraphLines.push(lines[i]);
@@ -75,7 +75,7 @@ function parseContent(content: string): React.ReactNode[] {
     }
     if (paragraphLines.length > 0) {
       elements.push(
-        <Paragraph key={key++} text={paragraphLines.join(' ')} />
+        <Paragraph key={key++} text={paragraphLines.join(' ')} onFileClick={onFileClick} />
       );
     }
   }
@@ -84,20 +84,16 @@ function parseContent(content: string): React.ReactNode[] {
 }
 
 // Inline formatting: **bold**, `code`, paths
-function formatInline(text: string): React.ReactNode[] {
+function formatInline(text: string, onFileClick?: (path: string) => void): React.ReactNode[] {
   const parts: React.ReactNode[] = [];
   let remaining = text;
   let key = 0;
 
   while (remaining.length > 0) {
-    // Bold **text**
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
-    // Inline code `code`
     const codeMatch = remaining.match(/`([^`]+)`/);
-    // Path detection (starts with / or ~/ or contains common path patterns)
-    const pathMatch = remaining.match(/((?:\/[\w.-]+)+|~\/[\w./-]+)/);
+    const pathMatch = remaining.match(/((?:\/[\w.-]+)+\.[\w]+|~\/[\w./-]+\.[\w]+)/);
 
-    // Find the earliest match
     let earliest: { type: string; match: RegExpMatchArray; index: number } | null = null;
 
     if (boldMatch && boldMatch.index !== undefined) {
@@ -110,7 +106,6 @@ function formatInline(text: string): React.ReactNode[] {
     }
     if (pathMatch && pathMatch.index !== undefined) {
       if (!earliest || pathMatch.index < earliest.index) {
-        // Only use path match if it's not inside code or bold
         if (!boldMatch || pathMatch.index < (boldMatch.index ?? Infinity)) {
           if (!codeMatch || pathMatch.index < (codeMatch.index ?? Infinity)) {
             earliest = { type: 'path', match: pathMatch, index: pathMatch.index };
@@ -124,12 +119,10 @@ function formatInline(text: string): React.ReactNode[] {
       break;
     }
 
-    // Add text before the match
     if (earliest.index > 0) {
       parts.push(remaining.slice(0, earliest.index));
     }
 
-    // Add the formatted element
     if (earliest.type === 'bold') {
       parts.push(<strong key={key++} className="font-semibold text-slate-900 dark:text-slate-100">{earliest.match[1]}</strong>);
       remaining = remaining.slice(earliest.index + earliest.match[0].length);
@@ -141,10 +134,15 @@ function formatInline(text: string): React.ReactNode[] {
       );
       remaining = remaining.slice(earliest.index + earliest.match[0].length);
     } else if (earliest.type === 'path') {
+      const filePath = earliest.match[0];
       parts.push(
-        <span key={key++} className="font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1 rounded">
-          {earliest.match[0]}
-        </span>
+        <button
+          key={key++}
+          onClick={() => onFileClick?.(filePath)}
+          className="font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1 rounded hover:bg-amber-100 dark:hover:bg-amber-900/50 hover:underline cursor-pointer"
+        >
+          {filePath}
+        </button>
       );
       remaining = remaining.slice(earliest.index + earliest.match[0].length);
     }
@@ -153,7 +151,6 @@ function formatInline(text: string): React.ReactNode[] {
   return parts;
 }
 
-// Components for different content types
 function CodeBlock({ code, language }: { code: string; language?: string }) {
   const [copied, setCopied] = React.useState(false);
 
@@ -206,88 +203,37 @@ function FileList({ files }: { files: { name: string; desc: string }[] }) {
   );
 }
 
-function BulletList({ items }: { items: string[] }) {
+function BulletList({ items, onFileClick }: { items: string[]; onFileClick?: (path: string) => void }) {
   return (
     <ul className="my-2 space-y-1">
       {items.map((item, i) => (
         <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
-          <span className="text-slate-400 dark:text-slate-500 select-none"></span>
-          <span>{formatInline(item)}</span>
+          <span className="text-slate-400 dark:text-slate-500 select-none">•</span>
+          <span>{formatInline(item, onFileClick)}</span>
         </li>
       ))}
     </ul>
   );
 }
 
-function Paragraph({ text }: { text: string }) {
+function Paragraph({ text, onFileClick }: { text: string; onFileClick?: (path: string) => void }) {
   return (
     <p className="my-2 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-      {formatInline(text)}
+      {formatInline(text, onFileClick)}
     </p>
   );
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, isStreaming }) => {
-  const isUser = role === 'user';
-
+export const TextStep: React.FC<TextStepProps> = ({ step, onFileClick }) => {
   const parsedContent = useMemo(() => {
-    if (isUser) return null;
-    return parseContent(content);
-  }, [content, isUser]);
+    return parseContent(step.content || '', onFileClick);
+  }, [step.content, onFileClick]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(content);
-  };
-
-  // User message - simple right-aligned
-  if (isUser) {
-    return (
-      <div className="flex justify-end mb-6">
-        <div className="flex items-start gap-3 max-w-[70%]">
-          <div className="bg-blue-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-sm text-sm">
-            {content}
-          </div>
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
-            <User size={14} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Assistant message - full width, IDE style
   return (
-    <div className="group mb-6">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="flex h-6 w-6 items-center justify-center rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-          <Terminal size={12} />
-        </div>
-        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">Agent</span>
-        {isStreaming && (
-          <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-            Working...
-          </span>
-        )}
-      </div>
-
-      <div className="pl-8 pr-4">
-        {parsedContent}
-        {isStreaming && (
-          <span className="inline-block w-2 h-4 bg-slate-400 dark:bg-slate-500 animate-pulse ml-0.5" />
-        )}
-      </div>
-
-      {/* Copy button */}
-      {!isStreaming && content && (
-        <div className="pl-8 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-          >
-            <Copy size={12} /> Copy response
-          </button>
-        </div>
+    <div className="relative">
+      {parsedContent}
+      {step.isStreaming && (
+        <span className="inline-block w-2 h-4 bg-slate-400 dark:bg-slate-500 animate-pulse ml-0.5" />
       )}
     </div>
   );

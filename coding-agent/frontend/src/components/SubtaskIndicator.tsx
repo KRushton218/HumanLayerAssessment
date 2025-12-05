@@ -21,17 +21,17 @@ export const SubtaskIndicator: React.FC<SubtaskIndicatorProps> = ({ subtask }) =
   };
 
   return (
-    <div className="mx-4 mb-4 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+    <div className="mx-4 mb-4 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
       <div className="flex items-center gap-2 mb-1">
         {getIcon()}
-        <span className="text-xs font-semibold text-slate-700">
+        <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
           {subtask.status === 'running' ? 'Subtask Running' :
            subtask.status === 'completed' ? 'Subtask Complete' : 'Subtask Failed'}
         </span>
       </div>
-      <p className="text-xs text-slate-500 truncate">{subtask.prompt}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{subtask.prompt}</p>
       {subtask.summary && (
-        <p className="text-xs text-slate-600 mt-1 line-clamp-2">{subtask.summary}</p>
+        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{subtask.summary}</p>
       )}
     </div>
   );

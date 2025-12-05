@@ -8,7 +8,7 @@ interface ToolStatusItemProps {
 
 export const ToolStatusItem: React.FC<ToolStatusItemProps> = ({ tool }) => {
   return (
-    <div className="flex items-center gap-2 py-2 border-b border-slate-100 last:border-0 overflow-hidden">
+    <div className="flex items-center gap-2 py-2 border-b border-slate-100 dark:border-slate-700 last:border-0 overflow-hidden">
       <div className="shrink-0">
         {tool.status === 'running' && (
           <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
@@ -18,9 +18,9 @@ export const ToolStatusItem: React.FC<ToolStatusItemProps> = ({ tool }) => {
       </div>
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="flex items-center gap-1.5">
-          <span className="font-mono text-xs text-slate-700 font-medium shrink-0">{tool.name}</span>
+          <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-medium shrink-0">{tool.name}</span>
           {tool.summary && (
-            <span className="text-xs text-slate-400 truncate">
+            <span className="text-xs text-slate-400 dark:text-slate-500 truncate">
               - {tool.summary}
             </span>
           )}
