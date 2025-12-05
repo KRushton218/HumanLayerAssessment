@@ -22,14 +22,16 @@ export class TodoMiddleware implements Middleware {
   name = 'TodoMiddleware';
 
   systemPrompt = `## Todo List (Planning Tool)
-You have access to a todo list for tracking task progress.
-- Use write_todos to update your task list when starting work
-- Use read_todos to check current progress
-- Mark tasks in_progress BEFORE starting work on them
-- Mark tasks completed IMMEDIATELY after finishing
-- Break complex tasks into smaller subtasks
-- Never have more than one task in_progress at a time
-- Update todos frequently to show progress`;
+You have access to a todo list for tracking task progress. The todo list is visible to the user in a sidebar.
+
+Guidelines:
+- Create a clear plan with write_todos BEFORE starting work
+- Mark exactly ONE task as "in_progress" - this shows the user what you're currently doing
+- Mark tasks "completed" as you finish them
+- Keep task descriptions short and action-oriented (e.g., "Create project folder", "Add HTML file")
+- DO NOT narrate your todo updates in chat - just update them silently
+- Your chat output should focus on the actual work, not on todo management
+- The in_progress task should match what you're describing in your response`;
 
   tools: ToolDefinition[] = [
     {
