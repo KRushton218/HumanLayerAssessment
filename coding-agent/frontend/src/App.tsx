@@ -14,6 +14,7 @@ import {
   TargetSelector,
   ThemeToggle,
   FilePreviewModal,
+  ApprovalDialog,
 } from './components';
 import { useSSE } from './hooks/useSSE';
 import * as api from './api';
@@ -25,6 +26,8 @@ import type {
   ContextUsage,
   Checkpoint,
   AssistantStep,
+  ApprovalRequest,
+  ApprovalDecision,
 } from './types';
 
 // Helper to extract file path from tool summary
@@ -47,6 +50,7 @@ function App() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [targetDirectory, setTargetDirectory] = useState('');
   const [previewFile, setPreviewFile] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<ApprovalRequest | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentStepsRef = useRef<AssistantStep[]>([]);
@@ -127,7 +131,7 @@ function App() {
       // (the state update function runs asynchronously when React processes the batch)
       const stepIdToComplete = activeToolStepRef.current;
       activeToolStepRef.current = null;
-      
+
       if (stepIdToComplete) {
         setCurrentSteps(prev => prev.map(s =>
           s.id === stepIdToComplete
@@ -209,6 +213,33 @@ function App() {
       console.error('Agent error:', error);
       setIsProcessing(false);
     }, []),
+
+    approval_required: useCallback((data: unknown) => {
+      const request = data as ApprovalRequest;
+      setPendingApproval(request);
+      // Update the current tool step to show pending_approval status
+      setCurrentSteps(prev => prev.map(s =>
+        s.type === 'tool' && s.status === 'running'
+          ? { ...s, status: 'pending_approval' }
+          : s
+      ));
+    }, []),
+
+    approval_result: useCallback((data: unknown) => {
+      const { requestId, approved } = data as { requestId: string; approved: boolean };
+      // Clear pending approval if it matches
+      setPendingApproval(prev =>
+        prev?.requestId === requestId ? null : prev
+      );
+      // Update tool step status back to running if approved, or to failed if denied
+      if (approved) {
+        setCurrentSteps(prev => prev.map(s =>
+          s.type === 'tool' && s.status === 'pending_approval'
+            ? { ...s, status: 'running' }
+            : s
+        ));
+      }
+    }, []),
   };
 
   useSSE(sessionId, sseHandlers);
@@ -277,6 +308,19 @@ function App() {
   const handleTargetChange = async (newTarget: string) => {
     const result = await api.setTarget(newTarget);
     setTargetDirectory(result.targetDirectory);
+  };
+
+  const handleApprovalResponse = async (
+    decision: ApprovalDecision,
+    pattern?: string
+  ) => {
+    if (!pendingApproval) return;
+    try {
+      await api.sendApprovalResponse(pendingApproval.requestId, decision, pattern);
+    } catch (err) {
+      console.error('Failed to send approval response:', err);
+    }
+    setPendingApproval(null);
   };
 
   return (
@@ -381,6 +425,14 @@ function App() {
         filePath={previewFile}
         onClose={() => setPreviewFile(null)}
       />
+
+      {/* Approval Dialog */}
+      {pendingApproval && (
+        <ApprovalDialog
+          request={pendingApproval}
+          onRespond={handleApprovalResponse}
+        />
+      )}
     </div>
   );
 }

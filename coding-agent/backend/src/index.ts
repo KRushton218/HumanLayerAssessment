@@ -3,6 +3,7 @@ import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 import { MiddlewareManager, TodoMiddleware, FilesystemMiddleware, SubAgentMiddleware } from './middleware/index.js';
 import { LLMClient, ContextManager, CheckpointManager, Orchestrator } from './agent/index.js';
+import { ApprovalManager } from './approval/index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,11 +25,13 @@ middlewareManager.register(subAgentMiddleware);
 const llmClient = new LLMClient();
 const contextManager = new ContextManager();
 const checkpointManager = new CheckpointManager();
+const approvalManager = new ApprovalManager();
 const orchestrator = new Orchestrator(
   middlewareManager,
   llmClient,
   contextManager,
-  checkpointManager
+  checkpointManager,
+  approvalManager
 );
 
 // Store active SSE connections
@@ -247,6 +250,29 @@ app.post('/api/target/validate', async (req: Request, res: Response) => {
   } catch (err) {
     const error = err instanceof Error ? err.message : 'Unknown error';
     res.json({ valid: false, error });
+  }
+});
+
+// Handle approval response from frontend
+app.post('/api/approval', (req: Request, res: Response) => {
+  const { requestId, decision, pattern } = req.body;
+
+  if (!requestId || !decision) {
+    res.status(400).json({ error: 'requestId and decision required' });
+    return;
+  }
+
+  const validDecisions = ['allow_once', 'allow_pattern', 'allow_tool', 'deny'];
+  if (!validDecisions.includes(decision)) {
+    res.status(400).json({ error: 'Invalid decision. Must be: allow_once, allow_pattern, allow_tool, or deny' });
+    return;
+  }
+
+  const success = approvalManager.handleResponse({ requestId, decision, pattern });
+  if (success) {
+    res.json({ status: 'processed' });
+  } else {
+    res.status(404).json({ error: 'Approval request not found or expired' });
   }
 });
 

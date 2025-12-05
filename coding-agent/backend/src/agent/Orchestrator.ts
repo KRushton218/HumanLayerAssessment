@@ -4,6 +4,7 @@ import { ToolContext } from '../tools/ToolRegistry.js';
 import { LLMClient, ContentBlock, Message } from './LLMClient.js';
 import { ContextManager } from './ContextManager.js';
 import { CheckpointManager } from './CheckpointManager.js';
+import { ApprovalManager } from '../approval/index.js';
 
 export interface OrchestratorConfig {
   workingDirectory: string;
@@ -15,18 +16,21 @@ export class Orchestrator {
   private llmClient: LLMClient;
   private contextManager: ContextManager;
   private checkpointManager: CheckpointManager;
+  private approvalManager: ApprovalManager;
   private states = new Map<string, AgentState>();
 
   constructor(
     middlewareManager: MiddlewareManager,
     llmClient: LLMClient,
     contextManager: ContextManager,
-    checkpointManager: CheckpointManager
+    checkpointManager: CheckpointManager,
+    approvalManager: ApprovalManager
   ) {
     this.middlewareManager = middlewareManager;
     this.llmClient = llmClient;
     this.contextManager = contextManager;
     this.checkpointManager = checkpointManager;
+    this.approvalManager = approvalManager;
   }
 
   getOrCreateState(sessionId: string): AgentState {
@@ -130,12 +134,44 @@ export class Orchestrator {
           const tool = toolRegistry.get(tc.name);
           if (tool) {
             const input = JSON.parse(tc.input || '{}');
-            const result = await tool.execute(input, toolContext);
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: tc.id,
-              content: result.success ? result.output : `Error: ${result.error}`,
-            });
+
+            // Check if approval is needed
+            const { needsApproval, request } = this.approvalManager.checkApproval(
+              sessionId,
+              tc.name,
+              input
+            );
+
+            let approved = true;
+            if (needsApproval && request) {
+              // Emit approval request to frontend
+              config.emit('approval_required', request);
+
+              // Wait for user response
+              approved = await this.approvalManager.waitForApproval(request);
+
+              // Emit approval result
+              config.emit('approval_result', {
+                requestId: request.requestId,
+                approved,
+              });
+            }
+
+            if (approved) {
+              const result = await tool.execute(input, toolContext);
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: tc.id,
+                content: result.success ? result.output : `Error: ${result.error}`,
+              });
+            } else {
+              // Tool was denied
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: tc.id,
+                content: 'Error: Tool execution denied by user',
+              });
+            }
           } else {
             toolResults.push({
               type: 'tool_result',
@@ -194,5 +230,9 @@ export class Orchestrator {
 
   hasApiKey(): boolean {
     return this.llmClient.hasApiKey();
+  }
+
+  getApprovalManager(): ApprovalManager {
+    return this.approvalManager;
   }
 }

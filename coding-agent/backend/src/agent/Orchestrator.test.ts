@@ -5,6 +5,7 @@ import { MiddlewareManager } from '../middleware/MiddlewareManager.js';
 import { LLMClient, StreamEvent } from './LLMClient.js';
 import { ContextManager } from './ContextManager.js';
 import { CheckpointManager } from './CheckpointManager.js';
+import { ApprovalManager } from '../approval/index.js';
 import { Middleware } from '../middleware/types.js';
 import { ToolResult } from '../tools/ToolRegistry.js';
 
@@ -25,6 +26,7 @@ describe('Orchestrator', () => {
   let mockLLMClient: { streamMessage: ReturnType<typeof vi.fn>; setModel: ReturnType<typeof vi.fn> };
   let contextManager: ContextManager;
   let checkpointManager: CheckpointManager;
+  let approvalManager: ApprovalManager;
   let mockConfig: OrchestratorConfig;
 
   // Helper to create async generator from events
@@ -42,12 +44,14 @@ describe('Orchestrator', () => {
     };
     contextManager = new ContextManager();
     checkpointManager = new CheckpointManager();
+    approvalManager = new ApprovalManager();
 
     orchestrator = new Orchestrator(
       middlewareManager,
       mockLLMClient as unknown as LLMClient,
       contextManager,
-      checkpointManager
+      checkpointManager,
+      approvalManager
     );
 
     mockConfig = {

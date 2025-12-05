@@ -55,10 +55,29 @@ export interface AssistantStep {
   toolInput?: Record<string, unknown>;
   toolOutput?: string;
   toolSummary?: string;
-  status?: 'running' | 'completed' | 'failed';
+  status?: 'running' | 'completed' | 'failed' | 'pending_approval';
   filePath?: string;
 
   // For subtask steps
   subtaskPrompt?: string;
   subtaskSummary?: string;
 }
+
+// Approval flow types
+export interface ApprovalRequest {
+  requestId: string;
+  sessionId: string;
+  toolName: string;
+  toolInput: Record<string, unknown>;
+  summary: string;
+  isDangerous: boolean;
+  timestamp: number;
+  suggestedPattern?: string;
+}
+
+export type ApprovalDecision = 'allow_once' | 'allow_pattern' | 'allow_tool' | 'deny';
+
+export interface ApprovalResponse {
+  requestId: string;
+  decision: ApprovalDecision;
+  pattern?: string;

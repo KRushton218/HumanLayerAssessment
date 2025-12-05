@@ -1,3 +1,5 @@
+import type { ApprovalDecision } from './types';
+
 const API_BASE = 'http://localhost:3001/api';
 
 export async function createSession(): Promise<string> {
@@ -125,3 +127,17 @@ export async function readFile(filePath: string): Promise<FilePreview> {
   }
   return res.json();
 }
+
+export async function sendApprovalResponse(
+  requestId: string,
+  decision: ApprovalDecision,
+  pattern?: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/approval`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ requestId, decision, pattern }),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Failed to send approval response');
