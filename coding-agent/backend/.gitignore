@@ -1,0 +1,5 @@
+node_modules/
+dist/
+test_output.txt
+$HOME/
+*.log
