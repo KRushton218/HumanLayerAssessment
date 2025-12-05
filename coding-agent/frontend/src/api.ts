@@ -62,3 +62,35 @@ export async function getApiKeyStatus(): Promise<{ hasApiKey: boolean }> {
   const res = await fetch(`${API_BASE}/apikey/status`);
   return res.json();
 }
+
+export interface TargetInfo {
+  targetDirectory: string;
+  allowedPaths: string[];
+}
+
+export async function getTarget(): Promise<TargetInfo> {
+  const res = await fetch(`${API_BASE}/target`);
+  return res.json();
+}
+
+export async function setTarget(targetDirectory: string): Promise<TargetInfo & { status: string }> {
+  const res = await fetch(`${API_BASE}/target`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetDirectory }),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Failed to set target directory');
+  }
+  return res.json();
+}
+
+export async function validateTarget(targetDirectory: string): Promise<{ valid: boolean; resolvedPath?: string; error?: string }> {
+  const res = await fetch(`${API_BASE}/target/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetDirectory }),
+  });
+  return res.json();
+}

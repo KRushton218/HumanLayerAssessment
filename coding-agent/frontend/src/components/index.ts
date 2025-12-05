@@ -8,3 +8,4 @@ export { ModelSelector } from './ModelSelector';
 export { CheckpointControls } from './CheckpointControls';
 export { ApiKeyInput } from './ApiKeyInput';
 export { ProgressBar } from './ProgressBar';
+export { TargetSelector } from './TargetSelector';

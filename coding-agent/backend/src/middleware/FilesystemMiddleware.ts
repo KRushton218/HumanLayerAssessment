@@ -37,6 +37,35 @@ export class FilesystemMiddleware implements Middleware {
     this.allowedPaths = allowedPaths.map(p => path.resolve(p));
   }
 
+  /**
+   * Set the allowed paths for file operations (target directory)
+   */
+  setAllowedPaths(paths: string[]): void {
+    this.allowedPaths = paths.map(p => path.resolve(p));
+  }
+
+  /**
+   * Get the current allowed paths
+   */
+  getAllowedPaths(): string[] {
+    return [...this.allowedPaths];
+  }
+
+  /**
+   * Get the primary target directory (first allowed path)
+   */
+  getTargetDirectory(): string {
+    return this.allowedPaths[0] || process.cwd();
+  }
+
+  /**
+   * Set the primary target directory
+   */
+  setTargetDirectory(targetPath: string): void {
+    const resolved = path.resolve(targetPath);
+    this.allowedPaths = [resolved];
+  }
+
   systemPrompt = `## File Operations
 You have access to file system tools for reading, writing, and editing files.
 - Always check if files exist before writing (use list_directory)

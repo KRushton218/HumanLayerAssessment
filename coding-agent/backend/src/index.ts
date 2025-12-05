@@ -86,7 +86,7 @@ app.post('/api/chat', async (req: Request, res: Response) => {
 
   try {
     await orchestrator.processMessage(sessionId, message, {
-      workingDirectory: process.cwd(),
+      workingDirectory: filesystemMiddleware.getTargetDirectory(),
       emit: (event, data) => emitEvent(sessionId, event, data),
     });
 
@@ -172,6 +172,82 @@ app.post('/api/apikey', (req: Request, res: Response) => {
 // Check if API key is configured
 app.get('/api/apikey/status', (_req: Request, res: Response) => {
   res.json({ hasApiKey: orchestrator.hasApiKey() });
+});
+
+// Get current target directory
+app.get('/api/target', (_req: Request, res: Response) => {
+  res.json({
+    targetDirectory: filesystemMiddleware.getTargetDirectory(),
+    allowedPaths: filesystemMiddleware.getAllowedPaths()
+  });
+});
+
+// Set target directory
+app.post('/api/target', async (req: Request, res: Response) => {
+  const { targetDirectory } = req.body;
+
+  if (!targetDirectory) {
+    res.status(400).json({ error: 'targetDirectory required' });
+    return;
+  }
+
+  // Validate the directory exists and is accessible
+  const fs = await import('fs/promises');
+  const path = await import('path');
+
+  try {
+    const resolved = path.resolve(targetDirectory);
+    const stat = await fs.stat(resolved);
+
+    if (!stat.isDirectory()) {
+      res.status(400).json({ error: 'Path is not a directory' });
+      return;
+    }
+
+    filesystemMiddleware.setTargetDirectory(resolved);
+    res.json({
+      status: 'updated',
+      targetDirectory: resolved,
+      allowedPaths: filesystemMiddleware.getAllowedPaths()
+    });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Unknown error';
+    res.status(400).json({ error: `Invalid directory: ${error}` });
+  }
+});
+
+// Validate a target directory path
+app.post('/api/target/validate', async (req: Request, res: Response) => {
+  const { targetDirectory } = req.body;
+
+  if (!targetDirectory) {
+    res.status(400).json({ error: 'targetDirectory required' });
+    return;
+  }
+
+  const fs = await import('fs/promises');
+  const path = await import('path');
+
+  try {
+    const resolved = path.resolve(targetDirectory);
+    const stat = await fs.stat(resolved);
+
+    if (!stat.isDirectory()) {
+      res.json({ valid: false, error: 'Path is not a directory' });
+      return;
+    }
+
+    // Try to list directory to check read access
+    await fs.readdir(resolved);
+
+    res.json({
+      valid: true,
+      resolvedPath: resolved
+    });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : 'Unknown error';
+    res.json({ valid: false, error });
+  }
 });
 
 app.listen(PORT, () => {

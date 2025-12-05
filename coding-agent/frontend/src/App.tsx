@@ -10,6 +10,7 @@ import {
   CheckpointControls,
   ApiKeyInput,
   ProgressBar,
+  TargetSelector,
 } from './components';
 import { useSSE } from './hooks/useSSE';
 import * as api from './api';
@@ -34,6 +35,7 @@ function App() {
   const [model, setModel] = useState('claude-sonnet-4-20250514');
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [targetDirectory, setTargetDirectory] = useState('');
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const streamingTextRef = useRef('');
@@ -43,10 +45,11 @@ function App() {
     streamingTextRef.current = streamingText;
   }, [streamingText]);
 
-  // Initialize session and check API key status
+  // Initialize session, check API key status, and fetch target directory
   useEffect(() => {
     api.createSession().then(setSessionId);
     api.getApiKeyStatus().then(data => setHasApiKey(data.hasApiKey));
+    api.getTarget().then(data => setTargetDirectory(data.targetDirectory));
   }, []);
 
   // Auto-scroll to bottom
@@ -168,13 +171,26 @@ function App() {
     setCheckpoints([]);
   };
 
+  const handleTargetChange = async (newTarget: string) => {
+    const result = await api.setTarget(newTarget);
+    setTargetDirectory(result.targetDirectory);
+  };
+
   return (
     <div className="flex h-screen w-full bg-white text-slate-900">
       {/* LEFT: Main Chat Area */}
       <main className="flex flex-1 flex-col border-r border-slate-200">
         {/* Header */}
         <header className="flex h-14 items-center justify-between border-b border-slate-100 px-6">
-          <span className="font-semibold tracking-tight text-slate-900">Coding Agent</span>
+          <div className="flex items-center gap-4">
+            <span className="font-semibold tracking-tight text-slate-900">Coding Agent</span>
+            {targetDirectory && (
+              <TargetSelector
+                targetDirectory={targetDirectory}
+                onTargetChange={handleTargetChange}
+              />
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <ApiKeyInput onSubmit={handleApiKeySubmit} isConfigured={hasApiKey} />
             <ModelSelector model={model} onModelChange={handleModelChange} />
