@@ -18,6 +18,7 @@ export interface ContentBlock {
 export interface LLMClientConfig {
   model?: string;
   maxTokens?: number;
+  apiKey?: string;
 }
 
 export interface StreamEvent {
@@ -32,11 +33,22 @@ export class LLMClient {
   private client: Anthropic;
   private model: string;
   private maxTokens: number;
+  private apiKey: string | undefined;
 
   constructor(config: LLMClientConfig = {}) {
-    this.client = new Anthropic();
+    this.apiKey = config.apiKey;
+    this.client = new Anthropic(this.apiKey ? { apiKey: this.apiKey } : undefined);
     this.model = config.model || 'claude-sonnet-4-20250514';
     this.maxTokens = config.maxTokens || 8096;
+  }
+
+  setApiKey(apiKey: string): void {
+    this.apiKey = apiKey;
+    this.client = new Anthropic({ apiKey });
+  }
+
+  hasApiKey(): boolean {
+    return !!(this.apiKey || process.env.ANTHROPIC_API_KEY);
   }
 
   async *streamMessage(
