@@ -21,10 +21,12 @@ function getStatusIcon(status: string | undefined) {
 }
 
 export const SubtaskStep: React.FC<SubtaskStepProps> = ({ step, onToggleCollapse }) => {
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     running: 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20',
     completed: 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800',
     failed: 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-900/20',
+    pending_approval: 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20',
+    stopped: 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-800',
   };
 
   const borderColor = statusColors[step.status || 'running'];

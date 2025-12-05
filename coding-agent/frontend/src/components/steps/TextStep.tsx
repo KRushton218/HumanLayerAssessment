@@ -161,7 +161,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   };
 
   return (
-    <div className="my-3 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-900">
+    <div className="my-3 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-900 max-w-full">
       <div className="flex items-center justify-between px-3 py-1.5 bg-slate-800 border-b border-slate-700">
         <span className="text-xs text-slate-400 font-mono">{language || 'text'}</span>
         <button
@@ -172,7 +172,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <pre className="p-3 overflow-x-auto text-sm font-mono text-slate-100 leading-relaxed">
+      <pre className="p-3 overflow-x-auto text-sm font-mono text-slate-100 leading-relaxed max-w-full">
         <code>{code}</code>
       </pre>
     </div>

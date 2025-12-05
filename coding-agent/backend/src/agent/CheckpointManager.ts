@@ -33,12 +33,22 @@ export class CheckpointManager {
     return this.checkpoints.get(sessionId)?.get(checkpointId);
   }
 
-  listCheckpoints(sessionId: string): Array<{ id: string; timestamp: number }> {
+  updateCheckpointName(sessionId: string, checkpointId: string, name: string, actionSummary?: string): void {
+    const checkpoint = this.getCheckpoint(sessionId, checkpointId);
+    if (checkpoint) {
+      checkpoint.name = name;
+      if (actionSummary) {
+        checkpoint.actionSummary = actionSummary;
+      }
+    }
+  }
+
+  listCheckpoints(sessionId: string): Array<{ id: string; timestamp: number; name?: string; actionSummary?: string }> {
     const sessionCheckpoints = this.checkpoints.get(sessionId);
     if (!sessionCheckpoints) return [];
 
     return Array.from(sessionCheckpoints.values())
-      .map(c => ({ id: c.id, timestamp: c.timestamp }))
+      .map(c => ({ id: c.id, timestamp: c.timestamp, name: c.name, actionSummary: c.actionSummary }))
       .sort((a, b) => b.timestamp - a.timestamp);
   }
 

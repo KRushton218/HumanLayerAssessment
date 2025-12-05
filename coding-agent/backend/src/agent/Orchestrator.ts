@@ -4,6 +4,7 @@ import { ToolContext } from '../tools/ToolRegistry.js';
 import { LLMClient, ContentBlock, Message } from './LLMClient.js';
 import { ContextManager } from './ContextManager.js';
 import { CheckpointManager } from './CheckpointManager.js';
+import { CheckpointNameGenerator } from './CheckpointNameGenerator.js';
 import { ApprovalManager } from '../approval/index.js';
 
 export interface OrchestratorConfig {
@@ -16,6 +17,7 @@ export class Orchestrator {
   private llmClient: LLMClient;
   private contextManager: ContextManager;
   private checkpointManager: CheckpointManager;
+  private checkpointNameGenerator: CheckpointNameGenerator;
   private approvalManager: ApprovalManager;
   private states = new Map<string, AgentState>();
 
@@ -30,6 +32,7 @@ export class Orchestrator {
     this.llmClient = llmClient;
     this.contextManager = contextManager;
     this.checkpointManager = checkpointManager;
+    this.checkpointNameGenerator = new CheckpointNameGenerator();
     this.approvalManager = approvalManager;
   }
 
@@ -74,6 +77,10 @@ export class Orchestrator {
       emit: config.emit,
     };
 
+    // Track all text and tool calls across iterations for checkpoint naming
+    let allTextContent = '';
+    const allToolCalls: Array<{ name: string; input: Record<string, unknown> }> = [];
+
     // Agent loop - continue until no more tool calls
     let continueLoop = true;
     while (continueLoop) {
@@ -106,6 +113,9 @@ export class Orchestrator {
         }
       }
 
+      // Accumulate text for checkpoint naming
+      allTextContent += textContent;
+
       // Build assistant message content
       const assistantContent: ContentBlock[] = [];
       if (textContent) {
@@ -117,11 +127,15 @@ export class Orchestrator {
         continueLoop = true;
 
         for (const tc of toolCalls) {
+          // Accumulate tool calls for checkpoint naming
+          const parsedInput = JSON.parse(tc.input || '{}');
+          allToolCalls.push({ name: tc.name, input: parsedInput });
+
           assistantContent.push({
             type: 'tool_use',
             id: tc.id,
             name: tc.name,
-            input: JSON.parse(tc.input || '{}'),
+            input: parsedInput,
           });
         }
 
@@ -130,10 +144,12 @@ export class Orchestrator {
 
         // Execute tools and collect results
         const toolResults: ContentBlock[] = [];
-        for (const tc of toolCalls) {
+        for (let i = 0; i < toolCalls.length; i++) {
+          const tc = toolCalls[i];
           const tool = toolRegistry.get(tc.name);
           if (tool) {
-            const input = JSON.parse(tc.input || '{}');
+            // Use the input we already parsed and added to allToolCalls
+            const input = allToolCalls[allToolCalls.length - toolCalls.length + i].input;
 
             // Check if approval is needed
             const { needsApproval, request } = this.approvalManager.checkApproval(
@@ -196,6 +212,38 @@ export class Orchestrator {
     // Run after hooks
     state = await this.middlewareManager.runAfterHooks(state);
     this.states.set(sessionId, state);
+
+    // Generate checkpoint name asynchronously (non-blocking)
+    this.generateCheckpointName(
+      sessionId,
+      checkpointId,
+      userMessage,
+      allTextContent,
+      allToolCalls,
+      config.emit
+    );
+  }
+
+  private async generateCheckpointName(
+    sessionId: string,
+    checkpointId: string,
+    userMessage: string,
+    assistantText: string,
+    toolCalls: Array<{ name: string; input: Record<string, unknown> }>,
+    emit: (event: string, data: unknown) => void
+  ): Promise<void> {
+    try {
+      const { name, summary } = await this.checkpointNameGenerator.generateName({
+        userMessage,
+        assistantText,
+        toolCalls,
+      });
+
+      this.checkpointManager.updateCheckpointName(sessionId, checkpointId, name, summary);
+      emit('checkpoint_updated', { id: checkpointId, name, actionSummary: summary });
+    } catch (err) {
+      console.error('Failed to generate checkpoint name:', err);
+    }
   }
 
   revertToCheckpoint(sessionId: string, checkpointId: string): boolean {
@@ -226,6 +274,7 @@ export class Orchestrator {
 
   setApiKey(apiKey: string): void {
     this.llmClient.setApiKey(apiKey);
+    this.checkpointNameGenerator.setApiKey(apiKey);
   }
 
   hasApiKey(): boolean {

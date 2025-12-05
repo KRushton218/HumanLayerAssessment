@@ -276,16 +276,22 @@ export const TargetSelector: React.FC<TargetSelectorProps> = ({
                 key={suggestion}
                 type="button"
                 onClick={() => selectSuggestion(suggestion)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-left font-mono hover:bg-slate-50 dark:hover:bg-slate-700 ${
-                  index === selectedIndex ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'
+                className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-700 ${
+                  index === selectedIndex ? 'bg-blue-50 dark:bg-blue-900/30' : ''
                 }`}
               >
-                <FolderOpen size={12} className="text-amber-500 flex-shrink-0" />
-                <span className="truncate">
-                  <span className="text-slate-400 dark:text-slate-500">{parentPath}/</span>
-                  <span className="font-medium">{dirName}</span>
-                </span>
-                <ChevronRight size={12} className="ml-auto text-slate-300 dark:text-slate-500 flex-shrink-0" />
+                <FolderOpen size={14} className="text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <div className={`text-sm font-medium truncate ${
+                    index === selectedIndex ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-slate-200'
+                  }`}>
+                    {dirName || '/'}
+                  </div>
+                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate font-mono">
+                    {parentPath || '/'}
+                  </div>
+                </div>
+                <ChevronRight size={12} className="text-slate-300 dark:text-slate-500 flex-shrink-0" />
               </button>
             );
           })}
